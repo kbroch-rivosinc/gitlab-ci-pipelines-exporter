@@ -6,10 +6,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/mvisonneau/gitlab-ci-pipelines-exporter/pkg/config"
-	"github.com/mvisonneau/gitlab-ci-pipelines-exporter/pkg/schemas"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/mvisonneau/gitlab-ci-pipelines-exporter/pkg/config"
+	"github.com/mvisonneau/gitlab-ci-pipelines-exporter/pkg/schemas"
 )
 
 func TestNewRegistry(t *testing.T) {
@@ -47,6 +48,7 @@ func TestExportMetrics(_ *testing.T) {
 			"topics":    "alpha",
 			"ref":       "bar",
 			"kind":      "branch",
+			"source":    "schedule",
 			"variables": "beta",
 		},
 		Value: float64(107.7),
@@ -59,6 +61,7 @@ func TestExportMetrics(_ *testing.T) {
 			"topics":    "alpha",
 			"ref":       "bar",
 			"kind":      "branch",
+			"source":    "schedule",
 			"variables": "beta",
 		},
 		Value: float64(10),

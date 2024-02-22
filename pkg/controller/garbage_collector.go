@@ -5,10 +5,11 @@ import (
 	"reflect"
 	"regexp"
 
-	"github.com/imdario/mergo"
+	"dario.cat/mergo"
+	log "github.com/sirupsen/logrus"
+
 	"github.com/mvisonneau/gitlab-ci-pipelines-exporter/pkg/schemas"
 	"github.com/mvisonneau/gitlab-ci-pipelines-exporter/pkg/store"
-	log "github.com/sirupsen/logrus"
 )
 
 // GarbageCollectProjects ..

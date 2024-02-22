@@ -7,10 +7,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/mvisonneau/gitlab-ci-pipelines-exporter/pkg/config"
-	"github.com/mvisonneau/gitlab-ci-pipelines-exporter/pkg/schemas"
 	log "github.com/sirupsen/logrus"
 	goGitlab "github.com/xanzy/go-gitlab"
+
+	"github.com/mvisonneau/gitlab-ci-pipelines-exporter/pkg/config"
+	"github.com/mvisonneau/gitlab-ci-pipelines-exporter/pkg/schemas"
 )
 
 func (c *Controller) processPipelineEvent(ctx context.Context, e goGitlab.PipelineEvent) {
@@ -32,6 +33,34 @@ func (c *Controller) processPipelineEvent(ctx context.Context, e goGitlab.Pipeli
 
 	c.triggerRefMetricsPull(ctx, schemas.NewRef(
 		schemas.NewProject(e.Project.PathWithNamespace),
+		refKind,
+		refName,
+	))
+}
+
+func (c *Controller) processJobEvent(ctx context.Context, e goGitlab.JobEvent) {
+	var (
+		refKind schemas.RefKind
+		refName = e.Ref
+	)
+
+	if e.Tag {
+		refKind = schemas.RefKindTag
+	} else {
+		refKind = schemas.RefKindBranch
+	}
+
+	project, _, err := c.Gitlab.Projects.GetProject(e.ProjectID, nil)
+	if err != nil {
+		log.WithContext(ctx).
+			WithError(err).
+			Error("reading project from GitLab")
+
+		return
+	}
+
+	c.triggerRefMetricsPull(ctx, schemas.NewRef(
+		schemas.NewProject(project.PathWithNamespace),
 		refKind,
 		refName,
 	))

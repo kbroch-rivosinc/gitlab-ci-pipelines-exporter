@@ -2,14 +2,16 @@ package gitlab
 
 import (
 	"context"
+	"reflect"
 	"strconv"
 	"strings"
 
-	"github.com/mvisonneau/gitlab-ci-pipelines-exporter/pkg/schemas"
 	log "github.com/sirupsen/logrus"
 	goGitlab "github.com/xanzy/go-gitlab"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+
+	"github.com/mvisonneau/gitlab-ci-pipelines-exporter/pkg/schemas"
 )
 
 // ListRefPipelineJobs ..
@@ -19,7 +21,7 @@ func (c *Client) ListRefPipelineJobs(ctx context.Context, ref schemas.Ref) (jobs
 	span.SetAttributes(attribute.String("project_name", ref.Project.Name))
 	span.SetAttributes(attribute.String("ref_name", ref.Name))
 
-	if ref.LatestPipeline == (schemas.Pipeline{}) {
+	if reflect.DeepEqual(ref.LatestPipeline, (schemas.Pipeline{})) {
 		log.WithFields(
 			log.Fields{
 				"project-name": ref.Project.Name,
@@ -229,19 +231,32 @@ func (c *Client) ListRefMostRecentJobs(ctx context.Context, ref schemas.Ref) (jo
 	var (
 		foundJobs []*goGitlab.Job
 		resp      *goGitlab.Response
+		opt       *goGitlab.ListJobsOptions
 	)
 
-	options := &goGitlab.ListJobsOptions{
-		ListOptions: goGitlab.ListOptions{
-			Page:    1,
-			PerPage: 100,
-		},
+	keysetPagination := c.Version().PipelineJobsKeysetPaginationSupported()
+	if keysetPagination {
+		opt = &goGitlab.ListJobsOptions{
+			ListOptions: goGitlab.ListOptions{
+				Pagination: "keyset",
+				PerPage:    100,
+			},
+		}
+	} else {
+		opt = &goGitlab.ListJobsOptions{
+			ListOptions: goGitlab.ListOptions{
+				Page:    1,
+				PerPage: 100,
+			},
+		}
 	}
+
+	options := []goGitlab.RequestOptionFunc{goGitlab.WithContext(ctx)}
 
 	for {
 		c.rateLimit(ctx)
 
-		foundJobs, resp, err = c.Jobs.ListProjectJobs(ref.Project.Name, options, goGitlab.WithContext(ctx))
+		foundJobs, resp, err = c.Jobs.ListProjectJobs(ref.Project.Name, opt, options...)
 		if err != nil {
 			return
 		}
@@ -270,7 +285,8 @@ func (c *Client) ListRefMostRecentJobs(ctx context.Context, ref schemas.Ref) (jo
 			}
 		}
 
-		if resp.CurrentPage >= resp.NextPage {
+		if keysetPagination && resp.NextLink == "" ||
+			(!keysetPagination && resp.CurrentPage >= resp.NextPage) {
 			var notFoundJobs []string
 
 			for k := range jobsToRefresh {
@@ -291,7 +307,12 @@ func (c *Client) ListRefMostRecentJobs(ctx context.Context, ref schemas.Ref) (jo
 			break
 		}
 
-		options.Page = resp.NextPage
+		if keysetPagination {
+			options = []goGitlab.RequestOptionFunc{
+				goGitlab.WithContext(ctx),
+				goGitlab.WithKeysetPaginationParameters(resp.NextLink),
+			}
+		}
 	}
 
 	return

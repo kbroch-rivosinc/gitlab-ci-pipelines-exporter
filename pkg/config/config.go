@@ -17,28 +17,28 @@ type Config struct {
 	Global Global `yaml:",omitempty"`
 
 	// Log configuration for the exporter
-	Log Log `yaml:"log" validate:"dive"`
+	Log Log `yaml:"log"`
 
 	// OpenTelemetry configuration
-	OpenTelemetry OpenTelemetry `yaml:"opentelemetry" validate:"dive"`
+	OpenTelemetry OpenTelemetry `yaml:"opentelemetry"`
 
 	// Server related configuration
-	Server Server `yaml:"server" validate:"dive"`
+	Server Server `yaml:"server"`
 
 	// GitLab related configuration
-	Gitlab Gitlab `yaml:"gitlab" validate:"dive"`
+	Gitlab Gitlab `yaml:"gitlab"`
 
 	// Redis related configuration
-	Redis Redis `yaml:"redis" validate:"dive"`
+	Redis Redis `yaml:"redis"`
 
 	// Pull configuration
-	Pull Pull `yaml:"pull" validate:"dive"`
+	Pull Pull `yaml:"pull"`
 
 	// GarbageCollect configuration
-	GarbageCollect GarbageCollect `yaml:"garbage_collect" validate:"dive"`
+	GarbageCollect GarbageCollect `yaml:"garbage_collect"`
 
 	// Default parameters which can be overridden at either the Project or Wildcard level
-	ProjectDefaults ProjectParameters `yaml:"project_defaults" validate:"dive"`
+	ProjectDefaults ProjectParameters `yaml:"project_defaults"`
 
 	// List of projects to pull
 	Projects []Project `validate:"unique,at-least-1-project-or-wildcard,dive" yaml:"projects"`
@@ -109,8 +109,21 @@ type Gitlab struct {
 	// Whether to skip TLS validation when querying HealthURL
 	EnableTLSVerify bool `default:"true" yaml:"enable_tls_verify"`
 
-	// Rate limit for the GitLab API requests/sec
+	// Maximum limit for the GitLab API requests/sec
 	MaximumRequestsPerSecond int `default:"1" validate:"gte=1" yaml:"maximum_requests_per_second"`
+
+	// Burstable limit for the GitLab API requests/sec
+	BurstableRequestsPerSecond int `default:"5" validate:"gte=1" yaml:"burstable_requests_per_second"`
+
+	// Maximum amount of jobs to keep queue, if this limit is reached
+	// newly created ones will get dropped. As a best practice you should not change this value.
+	// Workarounds to avoid hitting the limit are:
+	// - increase polling intervals
+	// - increase API rate limit
+	// - reduce the amount of projects, refs, environments or metrics you are looking into
+	// - leverage webhooks instead of polling schedules
+	//
+	MaximumJobsQueueSize int `default:"1000" validate:"gte=10" yaml:"maximum_jobs_queue_size"`
 }
 
 // Redis ..

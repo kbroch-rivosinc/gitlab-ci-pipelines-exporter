@@ -6,13 +6,16 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/heptiolabs/healthcheck"
-	"github.com/mvisonneau/gitlab-ci-pipelines-exporter/pkg/ratelimit"
 	"github.com/paulbellamy/ratecounter"
 	goGitlab "github.com/xanzy/go-gitlab"
 	"go.opentelemetry.io/otel"
+
+	"github.com/mvisonneau/gitlab-ci-pipelines-exporter/pkg/ratelimit"
 )
 
 const (
@@ -31,9 +34,12 @@ type Client struct {
 
 	RateLimiter       ratelimit.Limiter
 	RateCounter       *ratecounter.RateCounter
-	RequestsCounter   uint64
+	RequestsCounter   atomic.Uint64
 	RequestsLimit     int
 	RequestsRemaining int
+
+	version GitLabVersion
+	mutex   sync.RWMutex
 }
 
 // ClientConfig ..
@@ -135,10 +141,27 @@ func (c *Client) rateLimit(ctx context.Context) {
 	ratelimit.Take(ctx, c.RateLimiter)
 	// Used for monitoring purposes
 	c.RateCounter.Incr(1)
-	c.RequestsCounter++
+	c.RequestsCounter.Add(1)
+}
+
+func (c *Client) UpdateVersion(version GitLabVersion) {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+	c.version = version
+}
+
+func (c *Client) Version() GitLabVersion {
+	c.mutex.RLock()
+	defer c.mutex.RUnlock()
+
+	return c.version
 }
 
 func (c *Client) requestsRemaining(response *goGitlab.Response) {
+	if response == nil {
+		return
+	}
+
 	if remaining := response.Header.Get("ratelimit-remaining"); remaining != "" {
 		c.RequestsRemaining, _ = strconv.Atoi(remaining)
 	}
